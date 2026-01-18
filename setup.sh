@@ -248,8 +248,9 @@ echo ""
 print_header "4. 测速脚本配置"
 
 print_info "测速脚本为必装项，正在配置参数..."
-# 测速脚本URL
-read_input "请输入测速脚本下载地址" "${SPEED_TEST_URL:-https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh}" SPEED_TEST_URL
+# 测速脚本URL（自动设置，不再询问用户）
+SPEED_TEST_URL="https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh"
+print_info "测速脚本地址已自动设置为：${CYAN}$SPEED_TEST_URL${NC}"
 
 # 线程数
 read_input "请输入测速线程数" "${SPEED_TEST_THREADS:-8}" SPEED_TEST_THREADS
