@@ -125,8 +125,12 @@ echo ""
 print_header "1. 路径配置"
 
 # 列出磁盘列表
-print_info "当前系统磁盘列表："
-df -hT | grep -E '^/dev/' | grep -v 'tmpfs' || true
+print_info "正在扫描您的系统磁盘..."
+echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
+printf "%-15s %-10s %-10s %-10s %-10s %s\n" "设备名" "文件系统" "总容量" "已用" "剩余" "挂载点"
+echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
+df -hT | grep -E '^/dev/' | grep -v 'tmpfs' | awk '{printf "%-15s %-10s %-10s %-10s %-10s %s\n", $1, $2, $3, $4, $5, $7}' || true
+echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
 echo ""
 
 # 自动寻找容量最大的挂载点作为推荐
@@ -134,12 +138,16 @@ RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | sort -k2 -hr | head -n 1 | awk '{
 if [ -z "$RECOMMENDED_PATH" ]; then
     RECOMMENDED_PATH="/vol2"
 fi
-print_info "推荐安装路径（容量最大磁盘）：$RECOMMENDED_PATH"
+
+print_info "💡 小贴士：网心云建议安装在剩余空间最大的机械硬盘（HDD）上。"
+print_info "🌟 系统为您自动选中的最佳磁盘是：${CYAN}$RECOMMENDED_PATH${NC}"
 echo ""
 
 # 监控路径
 while true; do
-    read_input "请输入要监控的磁盘路径" "${MONITOR_PATH:-$RECOMMENDED_PATH}" MONITOR_PATH
+    echo -e "${BLUE}[步骤 1/3]${NC} 请确认要监控的磁盘挂载点。"
+    echo -e "（脚本会监控这个盘的剩余空间，快满时自动清理缓存）"
+    read_input "请输入磁盘路径" "${MONITOR_PATH:-$RECOMMENDED_PATH}" MONITOR_PATH
     if validate_path "$MONITOR_PATH"; then
         print_info "路径验证成功：$MONITOR_PATH"
         break
@@ -152,18 +160,20 @@ while true; do
 done
 
 # 数据目录
-# 如果是第一次配置，根据推荐路径生成默认数据目录
+echo -e "\n${BLUE}[步骤 2/3]${NC} 请确认网心云的数据存储目录。"
+echo -e "（这是网心云存放缓存文件的地方，建议保持默认）"
 if [ -z "$WXEDGE_DATA_DIR" ]; then
     DEFAULT_DATA_DIR="${MONITOR_PATH}/1000/WXY"
 else
     DEFAULT_DATA_DIR="$WXEDGE_DATA_DIR"
 fi
-read_input "请输入网心云数据目录" "$DEFAULT_DATA_DIR" WXEDGE_DATA_DIR
+read_input "请输入数据目录" "$DEFAULT_DATA_DIR" WXEDGE_DATA_DIR
 
-# 清理路径（动态同步数据目录）
-# 注意：这里必须使用用户刚刚输入的 WXEDGE_DATA_DIR 变量
+# 清理路径
+echo -e "\n${BLUE}[步骤 3/3]${NC} 请确认需要自动清理的文件夹路径。"
+echo -e "（当磁盘空间不足时，脚本会清空这个文件夹里的临时任务文件）"
 DEFAULT_CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
-read_input "请输入需要清理的task目录" "${CLEAN_PATH:-$DEFAULT_CLEAN_PATH}" CLEAN_PATH
+read_input "请输入清理路径" "${CLEAN_PATH:-$DEFAULT_CLEAN_PATH}" CLEAN_PATH
 
 # 日志文件
 read_input "请输入日志文件路径" "${LOG_FILE:-/var/log/wxedge-monitor.log}" LOG_FILE
@@ -181,11 +191,9 @@ print_info "镜像版本已锁定为：onething1/wxedge:3.0.2"
 DOCKER_IMAGE="onething1/wxedge:3.0.2"
 
 # 代理地址
-print_info "Docker代理示例："
-echo "  - http://127.0.0.1:7890"
-echo "  - http://proxy.example.com:8080"
-echo "  - socks5://127.0.0.1:1080"
-read_input "请输入Docker代理地址" "${DOCKER_PROXY:-http://127.0.0.1:7890}" DOCKER_PROXY
+echo -e "\n${BLUE}[网络设置]${NC} 由于 Docker 官方镜像站访问受限，我们需要配置代理来拉取镜像。"
+echo -e "（如果您有自己的代理服务器，请在下方输入；如果没有，请保持默认或咨询管理员）"
+read_input "请输入代理地址" "${DOCKER_PROXY:-http://127.0.0.1:7890}" DOCKER_PROXY
 
 # 容器内挂载路径
 # 提取现有的挂载路径（如果存在）
