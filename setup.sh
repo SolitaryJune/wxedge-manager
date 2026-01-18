@@ -124,7 +124,13 @@ echo -e "${YELLOW}--------------------------------------------------------------
 echo ""
 
 # 自动寻找容量最大的挂载点作为推荐
-RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | sort -k2 -hr | head -n 1 | awk '{print $6}')
+# 排除根目录，优先寻找挂载在 /vol 或 /mnt 等位置的大容量磁盘
+RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | grep -v ' /$' | sort -k2 -hr | head -n 1 | awk '{print $6}')
+# 如果没找到非根目录的大盘，再考虑根目录
+if [ -z "$RECOMMENDED_PATH" ]; then
+    RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | sort -k2 -hr | head -n 1 | awk '{print $6}')
+fi
+# 兜底方案
 if [ -z "$RECOMMENDED_PATH" ]; then
     RECOMMENDED_PATH="/vol2"
 fi
@@ -137,7 +143,9 @@ echo ""
 while true; do
     echo -e "${BLUE}[步骤 1/2]${NC} 请确认要监控的磁盘挂载点。"
     echo -e "（脚本会监控这个盘的剩余空间，快满时自动清理缓存）"
-    read_input "请输入磁盘路径" "${MONITOR_PATH:-$RECOMMENDED_PATH}" MONITOR_PATH
+    # 强制使用检测到的最大磁盘作为默认值，除非用户之前已经配置过其他路径
+    CURRENT_DEFAULT="${MONITOR_PATH:-$RECOMMENDED_PATH}"
+    read_input "请输入磁盘路径" "$CURRENT_DEFAULT" MONITOR_PATH
     if validate_path "$MONITOR_PATH"; then
         print_info "路径验证成功：$MONITOR_PATH"
         break
