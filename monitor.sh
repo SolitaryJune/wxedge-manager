@@ -28,6 +28,12 @@ log_error() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - [ERROR] $message" | tee -a "$LOG_FILE" >&2
 }
 
+# 警告日志函数
+log_warn() {
+    local message="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [WARN] $message" | tee -a "$LOG_FILE"
+}
+
 # 路径验证函数
 validate_path() {
     local path="$1"
