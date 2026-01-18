@@ -176,14 +176,21 @@ log_info "Docker代理配置成功"
 
 log_info "========== 拉取Docker镜像 =========="
 
-log_info "正在拉取镜像：$DOCKER_IMAGE"
-log_warn "这可能需要几分钟时间，请耐心等待..."
-
-if $SUDO docker pull "$DOCKER_IMAGE"; then
-    log_info "镜像拉取成功"
+# 检查镜像是否已存在
+if $SUDO docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^$DOCKER_IMAGE$"; then
+    log_info "镜像 $DOCKER_IMAGE 已存在，跳过拉取"
 else
-    log_error "镜像拉取失败，请检查镜像名称和代理配置"
-    exit 1
+    log_info "正在测试镜像可用性并拉取：$DOCKER_IMAGE"
+    log_warn "这可能需要几分钟时间，请耐心等待..."
+    
+    # 尝试拉取镜像
+    if $SUDO docker pull "$DOCKER_IMAGE"; then
+        log_info "镜像拉取成功"
+    else
+        log_error "镜像拉取失败！"
+        log_error "请检查：1. 代理配置是否正确 2. 网络是否通畅 3. 镜像名称 $DOCKER_IMAGE 是否有效"
+        exit 1
+    fi
 fi
 
 # 验证镜像

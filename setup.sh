@@ -158,10 +158,8 @@ print_header "2. Docker配置"
 read_input "请输入容器名称" "${DOCKER_CONTAINER:-wxedge}" DOCKER_CONTAINER
 
 # 镜像名称
-print_info "常见的网心云镜像名称："
-echo "  - onething1/wxedge:3.0.2"
-echo "  - registry.hub.docker.com/onething1/wxedge:3.0.2"
-read_input "请输入Docker镜像名称（包含版本号）" "${DOCKER_IMAGE:-onething1/wxedge:3.0.2}" DOCKER_IMAGE
+print_info "镜像版本已锁定为：onething1/wxedge:3.0.2"
+DOCKER_IMAGE="onething1/wxedge:3.0.2"
 
 # 代理地址
 print_info "Docker代理示例："
