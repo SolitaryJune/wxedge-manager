@@ -1,0 +1,74 @@
+#!/bin/bash
+# 网心云Docker管理配置文件示例
+# 使用方法：
+#   1. 运行 ./setup.sh 使用交互式向导配置
+#   2. 或者复制此文件为 config.sh 并手动修改
+
+# ==================== 路径配置 ====================
+# 监控的磁盘路径
+MONITOR_PATH="/vol2"
+
+# 网心云数据目录
+WXEDGE_DATA_DIR="/vol2/1000/WXY/.onething_data"
+
+# 需要清理的task目录
+CLEAN_PATH="/vol2/1000/WXY/.onething_data/task"
+
+# 日志文件路径
+LOG_FILE="/var/log/wxedge-monitor.log"
+
+# ==================== Docker配置 ====================
+# 容器名称
+DOCKER_CONTAINER="wxedge"
+
+# 镜像名称（请根据实际情况修改）
+DOCKER_IMAGE="onething1/wxedge:3.0.2"
+
+# Docker代理地址（请根据实际情况修改）
+DOCKER_PROXY="http://127.0.0.1:7890"
+
+# 容器挂载配置（格式：宿主机路径:容器内路径）
+DOCKER_VOLUME="${WXEDGE_DATA_DIR}:/onething"
+
+# 网络模式（host 或 bridge）
+DOCKER_NETWORK="host"
+
+# 重启策略（always, unless-stopped, on-failure, no）
+DOCKER_RESTART="unless-stopped"
+
+# 是否需要特权模式（true/false）
+DOCKER_PRIVILEGED="false"
+
+# 额外的Docker运行参数（如需要）
+DOCKER_EXTRA_ARGS=""
+
+# ==================== 监控配置 ====================
+# 磁盘使用率阈值（百分比，超过此值触发清理）
+THRESHOLD_PERCENT=90
+
+# 容器停止超时时间（秒）
+STOP_TIMEOUT=30
+
+# 容器启动最大重试次数
+MAX_RETRY=3
+
+# 重试间隔（秒）
+RETRY_INTERVAL=5
+
+# ==================== 测速脚本配置 ====================
+# 测速脚本下载地址
+SPEED_TEST_URL="https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh"
+
+# 测速线程数
+SPEED_TEST_THREADS=8
+
+# 测速限速（单位根据脚本定义）
+SPEED_TEST_LIMIT=10
+
+# 是否在部署时运行测速脚本（true/false）
+RUN_SPEED_TEST_ON_DEPLOY="true"
+
+# ==================== 定时任务配置 ====================
+# 监控脚本执行时间（cron格式：分 时 日 月 周）
+# 默认：每天凌晨2点执行
+CRON_SCHEDULE="0 2 * * *"

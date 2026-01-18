@@ -1,0 +1,31 @@
+# 配置文件（包含敏感信息）
+config.sh
+
+# 备份文件
+*.backup
+*.backup.*
+
+# 日志文件
+*.log
+
+# 下载的测速脚本
+build_and_run_docker.sh
+
+# 临时文件
+*.tmp
+*.temp
+*~
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+.directory
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
