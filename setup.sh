@@ -192,13 +192,10 @@ echo -e "\n${BLUE}[网络设置]${NC} 由于 Docker 官方镜像站访问受限�
 echo -e "（如果您有自己的代理服务器，请在下方输入；如果没有，请保持默认或咨询管理员）"
 read_input "请输入代理地址" "${DOCKER_PROXY:-http://127.0.0.1:7890}" DOCKER_PROXY
 
-# 容器内挂载路径
-# 提取现有的挂载路径（如果存在）
-if [ -n "$DOCKER_VOLUME" ]; then
-    EXISTING_MOUNT=$(echo "$DOCKER_VOLUME" | cut -d: -f2)
-fi
-read_input "请输入容器内的挂载路径" "${EXISTING_MOUNT:-/storage}" DOCKER_MOUNT_PATH
+# 容器内挂载路径（强制锁定为 /storage，不再询问用户）
+DOCKER_MOUNT_PATH="/storage"
 DOCKER_VOLUME="${WXEDGE_DATA_DIR}:${DOCKER_MOUNT_PATH}"
+print_info "容器内挂载路径已锁定为：${CYAN}$DOCKER_MOUNT_PATH${NC}"
 
 # 网络模式
 print_info "网络模式：默认使用 host 模式（推荐，性能最好）"
