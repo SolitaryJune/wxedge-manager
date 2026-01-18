@@ -175,8 +175,9 @@ echo -e "（当磁盘空间不足时，脚本会清空这个文件夹里的临�
 DEFAULT_CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
 read_input "请输入清理路径" "${CLEAN_PATH:-$DEFAULT_CLEAN_PATH}" CLEAN_PATH
 
-# 日志文件
-read_input "请输入日志文件路径" "${LOG_FILE:-/var/log/wxedge-monitor.log}" LOG_FILE
+# 日志文件（自动存放在数据目录下，不再询问用户）
+LOG_FILE="${WXEDGE_DATA_DIR}/wxedge-monitor.log"
+print_info "日志文件将自动保存至：${CYAN}$LOG_FILE${NC}"
 
 echo ""
 
