@@ -175,16 +175,9 @@ read_input "请输入容器内的挂载路径" "/storage" DOCKER_MOUNT_PATH
 DOCKER_VOLUME="${WXEDGE_DATA_DIR}:${DOCKER_MOUNT_PATH}"
 
 # 网络模式
-print_info "网络模式选项："
-echo "  - host: 使用主机网络（推荐，性能最好）"
-echo "  - bridge: 使用桥接网络（需手动映射端口）"
-if read_confirm "是否使用host网络模式？" "y"; then
-    DOCKER_NETWORK="host"
-    DOCKER_PORT_MAP=""
-else
-    DOCKER_NETWORK="bridge"
-    read_input "请输入端口映射配置（格式：宿主机端口:容器端口）" "18888:18888" DOCKER_PORT_MAP
-fi
+print_info "网络模式：默认使用 host 模式（推荐，性能最好）"
+DOCKER_NETWORK="host"
+DOCKER_PORT_MAP=""
 
 # 重启策略
 print_info "重启策略选项："
