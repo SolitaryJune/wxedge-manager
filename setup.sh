@@ -110,14 +110,13 @@ echo ""
 
 if [ -f "$CONFIG_FILE" ]; then
     print_warn "检测到已存在的配置文件：$CONFIG_FILE"
-    if read_confirm "是否要重新配置？（将备份现有配置）" "n"; then
-        backup_file="${CONFIG_FILE}.backup.$(date +%Y%m%d%H%M%S)"
-        cp "$CONFIG_FILE" "$backup_file"
-        print_info "已备份现有配置到：$backup_file"
-    else
-        print_info "配置向导已取消"
-        exit 0
+    if read_confirm "是否加载现有配置作为默认值？" "y"; then
+        source "$CONFIG_FILE"
+        print_info "已加载现有配置"
     fi
+    backup_file="${CONFIG_FILE}.backup.$(date +%Y%m%d%H%M%S)"
+    cp "$CONFIG_FILE" "$backup_file"
+    print_info "已备份当前配置到：$backup_file"
 fi
 
 echo ""
@@ -127,7 +126,7 @@ print_header "1. 路径配置"
 
 # 监控路径
 while true; do
-    read_input "请输入要监控的磁盘路径" "/vol2" MONITOR_PATH
+    read_input "请输入要监控的磁盘路径" "${MONITOR_PATH:-/vol2}" MONITOR_PATH
     if validate_path "$MONITOR_PATH"; then
         print_info "路径验证成功：$MONITOR_PATH"
         break
@@ -140,14 +139,14 @@ while true; do
 done
 
 # 数据目录
-read_input "请输入网心云数据目录" "/vol2/1000/WXY" WXEDGE_DATA_DIR
+read_input "请输入网心云数据目录" "${WXEDGE_DATA_DIR:-/vol2/1000/WXY}" WXEDGE_DATA_DIR
 
 # 清理路径（动态同步数据目录）
 DEFAULT_CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
 read_input "请输入需要清理的task目录" "$DEFAULT_CLEAN_PATH" CLEAN_PATH
 
 # 日志文件
-read_input "请输入日志文件路径" "/var/log/wxedge-monitor.log" LOG_FILE
+read_input "请输入日志文件路径" "${LOG_FILE:-/var/log/wxedge-monitor.log}" LOG_FILE
 
 echo ""
 
@@ -155,23 +154,27 @@ echo ""
 print_header "2. Docker配置"
 
 # 容器名称
-read_input "请输入容器名称" "wxedge" DOCKER_CONTAINER
+read_input "请输入容器名称" "${DOCKER_CONTAINER:-wxedge}" DOCKER_CONTAINER
 
 # 镜像名称
 print_info "常见的网心云镜像名称："
 echo "  - onething1/wxedge:3.0.2"
 echo "  - registry.hub.docker.com/onething1/wxedge:3.0.2"
-read_input "请输入Docker镜像名称（包含版本号）" "onething1/wxedge:3.0.2" DOCKER_IMAGE
+read_input "请输入Docker镜像名称（包含版本号）" "${DOCKER_IMAGE:-onething1/wxedge:3.0.2}" DOCKER_IMAGE
 
 # 代理地址
 print_info "Docker代理示例："
 echo "  - http://127.0.0.1:7890"
 echo "  - http://proxy.example.com:8080"
 echo "  - socks5://127.0.0.1:1080"
-read_input "请输入Docker代理地址" "http://127.0.0.1:7890" DOCKER_PROXY
+read_input "请输入Docker代理地址" "${DOCKER_PROXY:-http://127.0.0.1:7890}" DOCKER_PROXY
 
 # 容器内挂载路径
-read_input "请输入容器内的挂载路径" "/storage" DOCKER_MOUNT_PATH
+# 提取现有的挂载路径（如果存在）
+if [ -n "$DOCKER_VOLUME" ]; then
+    EXISTING_MOUNT=$(echo "$DOCKER_VOLUME" | cut -d: -f2)
+fi
+read_input "请输入容器内的挂载路径" "${EXISTING_MOUNT:-/storage}" DOCKER_MOUNT_PATH
 DOCKER_VOLUME="${WXEDGE_DATA_DIR}:${DOCKER_MOUNT_PATH}"
 
 # 网络模式
@@ -206,7 +209,7 @@ echo ""
 print_header "3. 监控配置"
 
 # 磁盘阈值
-read_input "请输入磁盘使用率阈值（百分比，1-99）" "90" THRESHOLD_PERCENT
+read_input "请输入磁盘使用率阈值（百分比，1-99）" "${THRESHOLD_PERCENT:-90}" THRESHOLD_PERCENT
 
 # 容器停止超时
 read_input "请输入容器停止超时时间（秒）" "30" STOP_TIMEOUT
@@ -224,13 +227,13 @@ print_header "4. 测速脚本配置"
 
 print_info "测速脚本为必装项，正在配置参数..."
 # 测速脚本URL
-read_input "请输入测速脚本下载地址" "https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh" SPEED_TEST_URL
+read_input "请输入测速脚本下载地址" "${SPEED_TEST_URL:-https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh}" SPEED_TEST_URL
 
 # 线程数
-read_input "请输入测速线程数" "8" SPEED_TEST_THREADS
+read_input "请输入测速线程数" "${SPEED_TEST_THREADS:-8}" SPEED_TEST_THREADS
 
 # 限速
-read_input "请输入测速限速值" "10" SPEED_TEST_LIMIT
+read_input "请输入测速限速值" "${SPEED_TEST_LIMIT:-10}" SPEED_TEST_LIMIT
 
 RUN_SPEED_TEST_ON_DEPLOY="true"
 
@@ -244,7 +247,7 @@ echo "示例："
 echo "  - 0 2 * * *    每天凌晨2点"
 echo "  - 0 */6 * * *  每6小时"
 echo "  - 0 3 * * 0    每周日凌晨3点"
-read_input "请输入定时任务执行时间（cron格式）" "0 2 * * *" CRON_SCHEDULE
+read_input "请输入定时任务执行时间（cron格式）" "${CRON_SCHEDULE:-0 2 * * *}" CRON_SCHEDULE
 
 echo ""
 

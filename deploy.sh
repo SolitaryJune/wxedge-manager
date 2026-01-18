@@ -129,11 +129,20 @@ if [ -f "$DOCKER_DAEMON_CONFIG" ]; then
     $SUDO cp "$DOCKER_DAEMON_CONFIG" "$DOCKER_PROXY_BACKUP"
 fi
 
-# 配置代理
-log_info "配置Docker代理：$DOCKER_PROXY"
+# 检查现有代理配置
+CURRENT_PROXY=""
+if [ -f "$DOCKER_DAEMON_CONFIG" ]; then
+    CURRENT_PROXY=$(grep "http-proxy" "$DOCKER_DAEMON_CONFIG" | cut -d'"' -f4 || echo "")
+fi
 
-# 创建或更新daemon.json
-$SUDO bash -c "cat > $DOCKER_DAEMON_CONFIG" <<EOF
+if [ "$CURRENT_PROXY" = "$DOCKER_PROXY" ]; then
+    log_info "Docker代理配置已是最新，跳过配置步骤"
+else
+    # 配置代理
+    log_info "配置Docker代理：$DOCKER_PROXY"
+
+    # 创建或更新daemon.json
+    $SUDO bash -c "cat > $DOCKER_DAEMON_CONFIG" <<EOF
 {
   "proxies": {
     "http-proxy": "$DOCKER_PROXY",
@@ -143,10 +152,11 @@ $SUDO bash -c "cat > $DOCKER_DAEMON_CONFIG" <<EOF
 }
 EOF
 
-# 重启Docker服务
-log_info "重启Docker服务以应用代理配置..."
-$SUDO systemctl daemon-reload
-$SUDO systemctl restart docker
+    # 重启Docker服务
+    log_info "重启Docker服务以应用代理配置..."
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl restart docker
+fi
 
 # 等待Docker服务启动
 sleep 5
@@ -285,16 +295,13 @@ log_info "========== 设置定时任务 =========="
 MONITOR_SCRIPT="$SCRIPT_DIR/monitor.sh"
 chmod +x "$MONITOR_SCRIPT"
 
-# 检查crontab中是否已存在该任务
+# 幂等性添加定时任务：先删除旧任务，再添加新任务
 CRON_ENTRY="$CRON_SCHEDULE $MONITOR_SCRIPT >> $LOG_FILE 2>&1"
 
-if $SUDO crontab -l 2>/dev/null | grep -q "$MONITOR_SCRIPT"; then
-    log_warn "定时任务已存在，跳过添加"
-else
-    log_info "添加定时任务：$CRON_SCHEDULE"
-    ($SUDO crontab -l 2>/dev/null; echo "$CRON_ENTRY") | $SUDO crontab -
-    log_info "定时任务添加成功"
-fi
+log_info "更新定时任务配置..."
+# 提取不包含该脚本的所有现有任务，然后追加新任务
+($SUDO crontab -l 2>/dev/null | grep -v "$MONITOR_SCRIPT" || true; echo "$CRON_ENTRY") | $SUDO crontab -
+log_info "定时任务已更新：$CRON_SCHEDULE"
 
 # 显示当前的crontab
 log_info "当前定时任务列表："
