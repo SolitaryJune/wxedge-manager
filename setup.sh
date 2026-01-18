@@ -124,9 +124,22 @@ echo ""
 # ==================== 路径配置 ====================
 print_header "1. 路径配置"
 
+# 列出磁盘列表
+print_info "当前系统磁盘列表："
+df -hT | grep -E '^/dev/' | grep -v 'tmpfs' || true
+echo ""
+
+# 自动寻找容量最大的挂载点作为推荐
+RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | sort -k2 -hr | head -n 1 | awk '{print $6}')
+if [ -z "$RECOMMENDED_PATH" ]; then
+    RECOMMENDED_PATH="/vol2"
+fi
+print_info "推荐安装路径（容量最大磁盘）：$RECOMMENDED_PATH"
+echo ""
+
 # 监控路径
 while true; do
-    read_input "请输入要监控的磁盘路径" "${MONITOR_PATH:-/vol2}" MONITOR_PATH
+    read_input "请输入要监控的磁盘路径" "${MONITOR_PATH:-$RECOMMENDED_PATH}" MONITOR_PATH
     if validate_path "$MONITOR_PATH"; then
         print_info "路径验证成功：$MONITOR_PATH"
         break
@@ -139,7 +152,13 @@ while true; do
 done
 
 # 数据目录
-read_input "请输入网心云数据目录" "${WXEDGE_DATA_DIR:-/vol2/1000/WXY}" WXEDGE_DATA_DIR
+# 如果是第一次配置，根据推荐路径生成默认数据目录
+if [ -z "$WXEDGE_DATA_DIR" ]; then
+    DEFAULT_DATA_DIR="${MONITOR_PATH}/1000/WXY"
+else
+    DEFAULT_DATA_DIR="$WXEDGE_DATA_DIR"
+fi
+read_input "请输入网心云数据目录" "$DEFAULT_DATA_DIR" WXEDGE_DATA_DIR
 
 # 清理路径（动态同步数据目录）
 # 注意：这里必须使用用户刚刚输入的 WXEDGE_DATA_DIR 变量
