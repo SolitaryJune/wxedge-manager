@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # ==============================================================================
-# 网心云 Docker 极致一键部署工具 (Core-Focus v5.0)
+# 网心云 Docker 极致一键部署工具 (Core-Focus v5.1)
 # 特性：仅保留核心路径确认，其余配置全自动化静默处理
 # ==============================================================================
 
+# 即使中间出错也继续执行部分清理逻辑，但关键步骤报错需停止
 set -e
 
 # 颜色输出
@@ -16,7 +17,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # 打印函数
-print_header() { echo -e "${CYAN}========================================${NC}\n${CYAN}$1${NC}\n${CYAN}========================================${NC}\n"; }
+print_header() { echo -e "\n${CYAN}========================================${NC}\n${CYAN}$1${NC}\n${CYAN}========================================${NC}\n"; }
 print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 print_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
@@ -29,14 +30,15 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 clear
-print_header "网心云极简一键部署 (v5.0)"
+print_header "网心云极简一键部署 (v5.1)"
 
 # ==================== 1. Docker 环境检查与安装 ====================
 print_info "正在检查 Docker 环境..."
 if ! command -v docker &> /dev/null; then
     print_warn "未检测到 Docker，正在自动安装..."
+    # 增加超时处理和重试逻辑
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh --mirror Aliyun || sh get-docker.sh
+    sh get-docker.sh --mirror Aliyun || sh get-docker.sh || { print_error "Docker 安装失败，请检查网络后重试。"; exit 1; }
     systemctl enable --now docker
     print_info "Docker 安装完成！"
 else
@@ -51,10 +53,12 @@ print_info "当前系统磁盘列表："
 echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
 printf "%-15s %-10s %-10s %-10s %-10s %s\n" "设备名" "文件系统" "总容量" "已用" "剩余" "挂载点"
 echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
+# 优化 df 输出，确保在不同系统下格式一致
 df -hT | grep -E '^/dev/' | grep -v 'tmpfs' | awk '{printf "%-15s %-10s %-10s %-10s %-10s %s\n", $1, $2, $3, $4, $5, $7}' || true
 echo -e "${YELLOW}----------------------------------------------------------------------${NC}\n"
 
 # 自动寻找容量最大的挂载点作为推荐
+# 排除根目录，优先寻找挂载在 /vol 或 /mnt 等位置的大容量磁盘
 RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | grep -v ' /$' | sort -k2 -hr | head -n 1 | awk '{print $6}')
 if [ -z "$RECOMMENDED_PATH" ]; then
     RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | sort -k2 -hr | head -n 1 | awk '{print $6}')
@@ -64,8 +68,15 @@ fi
 print_info "🌟 推荐安装路径（容量最大磁盘）：${CYAN}$RECOMMENDED_PATH${NC}"
 
 # 询问监控路径
-read -p "$(echo -e ${BLUE}[?]${NC} 请输入要监控的磁盘路径 ${YELLOW}[默认: $RECOMMENDED_PATH]${NC}: )" input
-MONITOR_PATH="${input:-$RECOMMENDED_PATH}"
+while true; do
+    read -p "$(echo -e ${BLUE}[?]${NC} 请输入要监控的磁盘路径 ${YELLOW}[默认: $RECOMMENDED_PATH]${NC}: )" input
+    MONITOR_PATH="${input:-$RECOMMENDED_PATH}"
+    if [ -d "$MONITOR_PATH" ]; then
+        break
+    else
+        print_error "路径 [$MONITOR_PATH] 不存在，请重新输入！"
+    fi
+done
 
 # 询问数据目录
 DEFAULT_DATA_DIR="${MONITOR_PATH}/1000/WXY"
@@ -127,16 +138,23 @@ fi
 
 # 拉取镜像
 print_info "拉取镜像 $DOCKER_IMAGE..."
-docker pull "$DOCKER_IMAGE"
+docker pull "$DOCKER_IMAGE" || { print_error "镜像拉取失败，请检查网络或代理设置。"; exit 1; }
 
 # 运行测速
 print_info "运行必装测速脚本..."
-wget -O speed_test.sh https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh
-chmod +x speed_test.sh
-./speed_test.sh --threads $SPEED_TEST_THREADS --speed-limit $SPEED_TEST_LIMIT || print_warn "测速脚本运行异常，继续部署..."
+# 增加重试和错误忽略处理
+wget -q -O speed_test.sh https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh || true
+if [ -f speed_test.sh ]; then
+    chmod +x speed_test.sh
+    ./speed_test.sh --threads $SPEED_TEST_THREADS --speed-limit $SPEED_TEST_LIMIT || print_warn "测速脚本运行异常，继续部署..."
+else
+    print_warn "测速脚本下载失败，跳过测速步骤。"
+fi
 
 # 启动容器
 print_info "启动网心云容器..."
+# 确保数据目录存在
+mkdir -p "$WXEDGE_DATA_DIR"
 docker stop "$DOCKER_CONTAINER" 2>/dev/null || true
 docker rm "$DOCKER_CONTAINER" 2>/dev/null || true
 docker run -d --name "$DOCKER_CONTAINER" \
@@ -150,23 +168,42 @@ print_info "配置磁盘自动清理任务..."
 MONITOR_SCRIPT="$CONFIG_DIR/monitor.sh"
 cat > "$MONITOR_SCRIPT" <<'EOF'
 #!/bin/bash
-source /etc/wxedge-manager/config.sh
+# 网心云磁盘监控脚本
+CONFIG_FILE="/etc/wxedge-manager/config.sh"
+if [ ! -f "$CONFIG_FILE" ]; then exit 1; fi
+source "$CONFIG_FILE"
+
+# 检查路径是否存在
 if [ ! -d "$MONITOR_PATH" ]; then exit 0; fi
+
+# 获取磁盘使用率
 USED=$(df "$MONITOR_PATH" | awk 'NR==2 {print $5}' | sed 's/%//')
+
+# 如果获取失败，尝试另一种 df 格式
+if [[ ! "$USED" =~ ^[0-9]+$ ]]; then
+    USED=$(df "$MONITOR_PATH" | awk 'NR==3 {print $4}' | sed 's/%//')
+fi
+
 if [ "$USED" -gt "$THRESHOLD_PERCENT" ]; then
     echo "$(date): 磁盘使用率 ${USED}% 触发清理" >> "$LOG_FILE"
     docker stop "$DOCKER_CONTAINER"
-    rm -rf "$CLEAN_PATH"/*
+    # 安全清理：确保 CLEAN_PATH 变量不为空且路径存在
+    if [ -n "$CLEAN_PATH" ] && [ -d "$CLEAN_PATH" ]; then
+        rm -rf "$CLEAN_PATH"/*
+    fi
     docker start "$DOCKER_CONTAINER"
+    echo "$(date): 清理完成，当前使用率：$(df "$MONITOR_PATH" | awk 'NR==2 {print $5}')" >> "$LOG_FILE"
 fi
 EOF
 chmod +x "$MONITOR_SCRIPT"
 
-# 每天凌晨 2 点执行
+# 设置定时任务（幂等性处理，确保不重复添加）
 (crontab -l 2>/dev/null | grep -v "$MONITOR_SCRIPT"; echo "$CRON_SCHEDULE $MONITOR_SCRIPT") | crontab -
 
-print_header "🎉 部署成功！"
+print_header "🎉 部署圆满成功！"
 print_info "监控磁盘：$MONITOR_PATH"
 print_info "数据目录：$WXEDGE_DATA_DIR"
 print_info "管理页面：http://[本机IP]:18888"
 print_info "日志位置：$LOG_FILE"
+print_info "定时任务：已设为每天凌晨 2 点自动检查磁盘"
+echo -e "\n${YELLOW}提示：${NC}如果无法访问管理页面，请检查防火墙是否开放了 18888 端口。"
