@@ -252,27 +252,25 @@ fi
 
 # ==================== 部署测速脚本 ====================
 
-if [ "$RUN_SPEED_TEST_ON_DEPLOY" = "true" ]; then
-    log_info "========== 部署测速脚本 =========="
+log_info "========== 部署测速脚本 =========="
+
+SPEED_TEST_SCRIPT="$SCRIPT_DIR/build_and_run_docker.sh"
+
+log_info "下载测速脚本..."
+if wget -O "$SPEED_TEST_SCRIPT" "$SPEED_TEST_URL" 2>&1 | grep -q "saved"; then
+    log_info "测速脚本下载成功"
+    chmod +x "$SPEED_TEST_SCRIPT"
     
-    SPEED_TEST_SCRIPT="$SCRIPT_DIR/build_and_run_docker.sh"
-    
-    log_info "下载测速脚本..."
-    if wget -O "$SPEED_TEST_SCRIPT" "$SPEED_TEST_URL" 2>&1 | grep -q "saved"; then
-        log_info "测速脚本下载成功"
-        chmod +x "$SPEED_TEST_SCRIPT"
-        
-        log_info "运行测速脚本（线程：$SPEED_TEST_THREADS，限速：$SPEED_TEST_LIMIT）..."
-        if "$SPEED_TEST_SCRIPT" --threads "$SPEED_TEST_THREADS" --speed-limit "$SPEED_TEST_LIMIT"; then
-            log_info "测速脚本执行成功"
-        else
-            log_warn "测速脚本执行失败，但不影响主流程"
-        fi
+    log_info "运行测速脚本（线程：$SPEED_TEST_THREADS，限速：$SPEED_TEST_LIMIT）..."
+    if "$SPEED_TEST_SCRIPT" --threads "$SPEED_TEST_THREADS" --speed-limit "$SPEED_TEST_LIMIT"; then
+        log_info "测速脚本执行成功"
     else
-        log_warn "测速脚本下载失败，跳过测速"
+        log_error "测速脚本执行失败！"
+        exit 1
     fi
 else
-    log_info "跳过测速脚本部署（配置中已禁用）"
+    log_error "测速脚本下载失败！"
+    exit 1
 fi
 
 # ==================== 设置定时任务 ====================

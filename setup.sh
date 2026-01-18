@@ -226,24 +226,17 @@ echo ""
 # ==================== 测速脚本配置 ====================
 print_header "4. 测速脚本配置"
 
-# 是否启用测速
-if read_confirm "是否在部署时运行测速脚本？" "y"; then
-    RUN_SPEED_TEST_ON_DEPLOY="true"
-    
-    # 测速脚本URL
-    read_input "请输入测速脚本下载地址" "https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh" SPEED_TEST_URL
-    
-    # 线程数
-    read_input "请输入测速线程数" "8" SPEED_TEST_THREADS
-    
-    # 限速
-    read_input "请输入测速限速值" "10" SPEED_TEST_LIMIT
-else
-    RUN_SPEED_TEST_ON_DEPLOY="false"
-    SPEED_TEST_URL="https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh"
-    SPEED_TEST_THREADS="8"
-    SPEED_TEST_LIMIT="10"
-fi
+print_info "测速脚本为必装项，正在配置参数..."
+# 测速脚本URL
+read_input "请输入测速脚本下载地址" "https://git.gushao.club/https://github.com/SolitaryJune/speed_test/raw/main/build_and_run_docker.sh" SPEED_TEST_URL
+
+# 线程数
+read_input "请输入测速线程数" "8" SPEED_TEST_THREADS
+
+# 限速
+read_input "请输入测速限速值" "10" SPEED_TEST_LIMIT
+
+RUN_SPEED_TEST_ON_DEPLOY="true"
 
 echo ""
 
@@ -285,12 +278,9 @@ echo "  最大重试：${MAX_RETRY}次"
 echo "  重试间隔：${RETRY_INTERVAL}秒"
 echo ""
 echo "测速配置："
-echo "  启用测速：$RUN_SPEED_TEST_ON_DEPLOY"
-if [ "$RUN_SPEED_TEST_ON_DEPLOY" = "true" ]; then
-    echo "  脚本地址：$SPEED_TEST_URL"
-    echo "  线程数：$SPEED_TEST_THREADS"
-    echo "  限速值：$SPEED_TEST_LIMIT"
-fi
+echo "  脚本地址：$SPEED_TEST_URL"
+echo "  线程数：$SPEED_TEST_THREADS"
+echo "  限速值：$SPEED_TEST_LIMIT"
 echo ""
 echo "定时任务："
 echo "  执行时间：$CRON_SCHEDULE"
