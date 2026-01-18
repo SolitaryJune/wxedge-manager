@@ -89,16 +89,6 @@ validate_path() {
     fi
 }
 
-# 验证URL格式
-validate_url() {
-    local url="$1"
-    if [[ "$url" =~ ^https?:// ]] || [[ "$url" =~ ^socks5:// ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 # 开始配置
 clear
 print_header "网心云Docker管理工具 - 配置向导"
@@ -145,7 +135,7 @@ echo ""
 
 # 监控路径
 while true; do
-    echo -e "${BLUE}[步骤 1/3]${NC} 请确认要监控的磁盘挂载点。"
+    echo -e "${BLUE}[步骤 1/2]${NC} 请确认要监控的磁盘挂载点。"
     echo -e "（脚本会监控这个盘的剩余空间，快满时自动清理缓存）"
     read_input "请输入磁盘路径" "${MONITOR_PATH:-$RECOMMENDED_PATH}" MONITOR_PATH
     if validate_path "$MONITOR_PATH"; then
@@ -160,24 +150,22 @@ while true; do
 done
 
 # 数据目录
-echo -e "\n${BLUE}[步骤 2/3]${NC} 请确认网心云的数据存储目录。"
+echo -e "\n${BLUE}[步骤 2/2]${NC} 请确认网心云的数据存储目录。"
 echo -e "（这是网心云存放缓存文件的地方，建议保持默认）"
-if [ -z "$WXEDGE_DATA_DIR" ]; then
+if [ -z "$WXEDGE_DATA_DIR" ] || [[ "$WXEDGE_DATA_DIR" != "$MONITOR_PATH"* ]]; then
     DEFAULT_DATA_DIR="${MONITOR_PATH}/1000/WXY"
 else
     DEFAULT_DATA_DIR="$WXEDGE_DATA_DIR"
 fi
 read_input "请输入数据目录" "$DEFAULT_DATA_DIR" WXEDGE_DATA_DIR
 
-# 清理路径
-echo -e "\n${BLUE}[步骤 3/3]${NC} 请确认需要自动清理的文件夹路径。"
-echo -e "（当磁盘空间不足时，脚本会清空这个文件夹里的临时任务文件）"
-DEFAULT_CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
-read_input "请输入清理路径" "${CLEAN_PATH:-$DEFAULT_CLEAN_PATH}" CLEAN_PATH
-
-# 日志文件（自动存放在数据目录下，不再询问用户）
+# 自动计算清理路径和日志路径（不再询问用户）
+CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
 LOG_FILE="${WXEDGE_DATA_DIR}/wxedge-monitor.log"
-print_info "日志文件将自动保存至：${CYAN}$LOG_FILE${NC}"
+
+print_info "路径自动关联完成："
+echo -e "  - 自动清理路径：${CYAN}$CLEAN_PATH${NC}"
+echo -e "  - 自动日志路径：${CYAN}$LOG_FILE${NC}"
 
 echo ""
 
@@ -215,20 +203,22 @@ echo "  - always: 总是重启"
 echo "  - unless-stopped: 除非手动停止，否则总是重启（推荐）"
 echo "  - on-failure: 仅在失败时重启"
 echo "  - no: 不自动重启"
-read_input "请选择重启策略" "unless-stopped" DOCKER_RESTART
+read_input "请选择重启策略" "${DOCKER_RESTART:-unless-stopped}" DOCKER_RESTART
 
 # 特权模式
-if read_confirm "是否启用特权模式（privileged）？" "n"; then
+if [ "$DOCKER_PRIVILEGED" = "true" ]; then
+    DEFAULT_PRIV="y"
+else
+    DEFAULT_PRIV="n"
+fi
+if read_confirm "是否启用特权模式（privileged）？" "$DEFAULT_PRIV"; then
     DOCKER_PRIVILEGED="true"
 else
     DOCKER_PRIVILEGED="false"
 fi
 
 # 额外参数
-print_info "您可以添加额外的Docker运行参数，例如："
-echo "  - --memory=2g --cpus=2"
-echo "  - -e ENV_VAR=value"
-read_input "请输入额外的Docker参数（可留空）" "" DOCKER_EXTRA_ARGS
+read_input "请输入额外的Docker参数（可留空）" "${DOCKER_EXTRA_ARGS:-}" DOCKER_EXTRA_ARGS
 
 echo ""
 
@@ -239,13 +229,13 @@ print_header "3. 监控配置"
 read_input "请输入磁盘使用率阈值（百分比，1-99）" "${THRESHOLD_PERCENT:-90}" THRESHOLD_PERCENT
 
 # 容器停止超时
-read_input "请输入容器停止超时时间（秒）" "30" STOP_TIMEOUT
+read_input "请输入容器停止超时时间（秒）" "${STOP_TIMEOUT:-30}" STOP_TIMEOUT
 
 # 最大重试次数
-read_input "请输入容器启动最大重试次数" "3" MAX_RETRY
+read_input "请输入容器启动最大重试次数" "${MAX_RETRY:-3}" MAX_RETRY
 
 # 重试间隔
-read_input "请输入重试间隔（秒）" "5" RETRY_INTERVAL
+read_input "请输入重试间隔（秒）" "${RETRY_INTERVAL:-5}" RETRY_INTERVAL
 
 echo ""
 
@@ -273,7 +263,6 @@ print_info "定时任务使用cron格式：分 时 日 月 周"
 echo "示例："
 echo "  - 0 2 * * *    每天凌晨2点"
 echo "  - 0 */6 * * *  每6小时"
-echo "  - 0 3 * * 0    每周日凌晨3点"
 read_input "请输入定时任务执行时间（cron格式）" "${CRON_SCHEDULE:-0 2 * * *}" CRON_SCHEDULE
 
 echo ""
