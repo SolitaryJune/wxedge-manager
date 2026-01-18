@@ -61,24 +61,29 @@ git clone https://github.com/yourusername/wxedge-manager.git
 cd wxedge-manager
 ```
 
-#### 2. 运行配置向导
+#### 2. 一键部署（推荐）
+
+您可以根据网络环境选择以下一行命令完成所有部署和启动工作：
+
+**选项 A：标准 GitHub 链接（推荐非大陆用户）**
 
 ```bash
-./setup.sh
+wget -O install.sh https://raw.githubusercontent.com/SolitaryJune/wxedge-manager/main/setup.sh && chmod +x install.sh && ./install.sh && sudo ./deploy.sh
 ```
 
-配置向导会引导您完成所有必要的配置：
-- 📁 路径配置（监控路径、数据目录、清理路径）
-- 🐳 Docker配置（镜像、代理、网络、重启策略）
-- 📊 监控配置（阈值、超时、重试）
-- 🚀 测速脚本配置
-- ⏰ 定时任务配置
-
-#### 3. 运行部署脚本
+**选项 B：加速站点链接（推荐大陆用户）**
 
 ```bash
-sudo ./deploy.sh
+wget -O install.sh https://git.gushao.club/https://github.com/SolitaryJune/wxedge-manager/raw/main/setup.sh && chmod +x install.sh && ./install.sh && sudo ./deploy.sh
 ```
+
+### 📖 运行说明
+
+1. **执行权限**：脚本会自动添加执行权限。
+2. **交互配置**：运行后会进入交互式配置向导，请根据提示输入您的自定义路径、代理地址等信息。
+3. **Sudo 权限**：部署脚本 `deploy.sh` 需要 `sudo` 权限以配置 Docker 和定时任务。
+4. **自动清理**：部署完成后，系统会自动添加 Cron 定时任务，每天按设定时间检查并清理磁盘。
+5. **测速集成**：如果您在配置中启用了测速，部署过程中会自动下载并运行测速脚本。
 
 部署脚本会自动完成：
 - ✅ 环境检查
