@@ -142,8 +142,9 @@ done
 # 数据目录
 read_input "请输入网心云数据目录" "/vol2/1000/WXY" WXEDGE_DATA_DIR
 
-# 清理路径
-read_input "请输入需要清理的task目录" "${WXEDGE_DATA_DIR}/.onething_data/task" CLEAN_PATH
+# 清理路径（动态同步数据目录）
+DEFAULT_CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
+read_input "请输入需要清理的task目录" "$DEFAULT_CLEAN_PATH" CLEAN_PATH
 
 # 日志文件
 read_input "请输入日志文件路径" "/var/log/wxedge-monitor.log" LOG_FILE

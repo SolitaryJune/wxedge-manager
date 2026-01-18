@@ -142,8 +142,15 @@ validate_path "$CLEAN_PATH" "清理路径"
 
 # 检查监控路径是否存在
 if [ ! -d "$MONITOR_PATH" ]; then
-    log_error "监控路径不存在：$MONITOR_PATH"
-    exit 1
+    log_warn "监控路径 $MONITOR_PATH 不存在，尝试使用其父目录..."
+    MONITOR_BASE=$(dirname "$MONITOR_PATH")
+    if [ -d "$MONITOR_BASE" ]; then
+        log "切换监控路径至：$MONITOR_BASE"
+        MONITOR_PATH="$MONITOR_BASE"
+    else
+        log_error "监控路径及其父目录均不存在，脚本终止"
+        exit 1
+    fi
 fi
 
 # 获取已用空间百分比
