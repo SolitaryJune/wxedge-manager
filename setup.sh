@@ -230,17 +230,17 @@ echo ""
 # ==================== 监控配置 ====================
 print_header "3. 监控配置"
 
-# 磁盘阈值
-read_input "请输入磁盘使用率阈值（百分比，1-99）" "${THRESHOLD_PERCENT:-90}" THRESHOLD_PERCENT
+# 监控参数自动设置，不再询问用户
+THRESHOLD_PERCENT="${THRESHOLD_PERCENT:-90}"
+STOP_TIMEOUT="${STOP_TIMEOUT:-30}"
+MAX_RETRY="${MAX_RETRY:-3}"
+RETRY_INTERVAL="${RETRY_INTERVAL:-5}"
 
-# 容器停止超时
-read_input "请输入容器停止超时时间（秒）" "${STOP_TIMEOUT:-30}" STOP_TIMEOUT
-
-# 最大重试次数
-read_input "请输入容器启动最大重试次数" "${MAX_RETRY:-3}" MAX_RETRY
-
-# 重试间隔
-read_input "请输入重试间隔（秒）" "${RETRY_INTERVAL:-5}" RETRY_INTERVAL
+print_info "监控参数已自动配置："
+echo -e "  - 磁盘清理阈值：${CYAN}${THRESHOLD_PERCENT}%${NC}"
+echo -e "  - 容器停止超时：${CYAN}${STOP_TIMEOUT}秒${NC}"
+echo -e "  - 启动重试次数：${CYAN}${MAX_RETRY}次${NC}"
+echo -e "  - 启动重试间隔：${CYAN}${RETRY_INTERVAL}秒${NC}"
 
 echo ""
 
