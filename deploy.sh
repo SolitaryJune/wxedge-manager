@@ -212,6 +212,11 @@ if [ "$SKIP_CONTAINER_CREATE" != true ]; then
         --restart $DOCKER_RESTART \
         --network $DOCKER_NETWORK"
     
+    # 添加端口映射（如果不是host模式）
+    if [ "$DOCKER_NETWORK" != "host" ] && [ -n "$DOCKER_PORT_MAP" ]; then
+        DOCKER_CMD="$DOCKER_CMD -p $DOCKER_PORT_MAP"
+    fi
+    
     # 添加挂载
     if [ -n "$DOCKER_VOLUME" ]; then
         DOCKER_CMD="$DOCKER_CMD -v $DOCKER_VOLUME"

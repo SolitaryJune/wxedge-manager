@@ -33,6 +33,9 @@ DOCKER_VOLUME="${WXEDGE_DATA_DIR}:/onething"
 # 网络模式（host 或 bridge）
 DOCKER_NETWORK="host"
 
+# 端口映射（仅在 bridge 模式下生效，格式：宿主机端口:容器端口）
+DOCKER_PORT_MAP="18888:18888"
+
 # 重启策略（always, unless-stopped, on-failure, no）
 DOCKER_RESTART="unless-stopped"
 

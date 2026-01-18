@@ -140,10 +140,10 @@ while true; do
 done
 
 # 数据目录
-read_input "请输入网心云数据目录" "/vol2/1000/WXY/.onething_data" WXEDGE_DATA_DIR
+read_input "请输入网心云数据目录" "/vol2/1000/WXY" WXEDGE_DATA_DIR
 
 # 清理路径
-read_input "请输入需要清理的task目录" "${WXEDGE_DATA_DIR}/task" CLEAN_PATH
+read_input "请输入需要清理的task目录" "${WXEDGE_DATA_DIR}/.onething_data/task" CLEAN_PATH
 
 # 日志文件
 read_input "请输入日志文件路径" "/var/log/wxedge-monitor.log" LOG_FILE
@@ -170,17 +170,19 @@ echo "  - socks5://127.0.0.1:1080"
 read_input "请输入Docker代理地址" "http://127.0.0.1:7890" DOCKER_PROXY
 
 # 容器内挂载路径
-read_input "请输入容器内的挂载路径" "/onething" DOCKER_MOUNT_PATH
+read_input "请输入容器内的挂载路径" "/storage" DOCKER_MOUNT_PATH
 DOCKER_VOLUME="${WXEDGE_DATA_DIR}:${DOCKER_MOUNT_PATH}"
 
 # 网络模式
 print_info "网络模式选项："
-echo "  - host: 使用主机网络（推荐）"
-echo "  - bridge: 使用桥接网络"
+echo "  - host: 使用主机网络（推荐，性能最好）"
+echo "  - bridge: 使用桥接网络（需手动映射端口）"
 if read_confirm "是否使用host网络模式？" "y"; then
     DOCKER_NETWORK="host"
+    DOCKER_PORT_MAP=""
 else
     DOCKER_NETWORK="bridge"
+    read_input "请输入端口映射配置（格式：宿主机端口:容器端口）" "18888:18888" DOCKER_PORT_MAP
 fi
 
 # 重启策略
@@ -327,6 +329,9 @@ DOCKER_VOLUME="$DOCKER_VOLUME"
 
 # 网络模式（host 或 bridge）
 DOCKER_NETWORK="$DOCKER_NETWORK"
+
+# 端口映射（仅在 bridge 模式下生效）
+DOCKER_PORT_MAP="$DOCKER_PORT_MAP"
 
 # 重启策略（always, unless-stopped, on-failure, no）
 DOCKER_RESTART="$DOCKER_RESTART"
