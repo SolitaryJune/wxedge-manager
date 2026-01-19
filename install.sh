@@ -1,5 +1,5 @@
 #!/bin/sh
-# 网心云 Docker 极致一键部署工具 (v5.6.2)
+# 网心云 Docker 极致一键部署工具 (v5.6.3)
 # 针对 POSIX 标准进行了极致优化，确保在所有 Shell 环境下无语法错误
 
 # 颜色定义
@@ -31,7 +31,7 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
-print_header "网心云极简一键部署 (v5.6.2)"
+print_header "网心云极简一键部署 (v5.6.3)"
 
 # ==================== 1. 环境准备 ====================
 # 安装必要工具
@@ -120,6 +120,7 @@ else
     printf "  - 代理状态：已跳过\n"
 fi
 printf "  - 自动清理：磁盘使用率 > 90%% 时清理缓存\n"
+printf "  - 端口映射：18888:18888 (Bridge 模式)\n"
 printf "${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: "
 read input
 case "$input" in
@@ -156,9 +157,10 @@ print_info "启动网心云容器..."
 docker stop wxedge >/dev/null 2>&1
 docker rm wxedge >/dev/null 2>&1
 mkdir -p "$WXEDGE_DATA_DIR"
+# 修复：移除 --network host，改为端口映射 -p 18888:18888
 docker run -d --name wxedge \
   --restart unless-stopped \
-  --network host \
+  -p 18888:18888 \
   -v "$WXEDGE_DATA_DIR":/storage \
   onething1/wxedge:3.0.2
 
@@ -204,7 +206,7 @@ CRON_SCHEDULE="0 2 * * *"
 if command -v crontab >/dev/null 2>&1; then
     (crontab -l 2>/dev/null | grep -v "$MONITOR_SCRIPT"; echo "$CRON_SCHEDULE $MONITOR_SCRIPT") | crontab -
 else
-    print_warn "未检测到 crontab，无法设置定时任务。"
+    print_warn "未检测 to crontab，无法设置定时任务。"
 fi
 
 print_header "部署完成！"
