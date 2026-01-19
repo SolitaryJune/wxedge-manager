@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 网心云 Docker 极致一键部署工具 (v5.4.2)
+# 网心云 Docker 极致一键部署工具 (v5.5.0)
 # 特性：POSIX 兼容语法，优先读取 daemon.json，代理自动检测与回退
 # ==============================================================================
 
@@ -33,7 +33,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 clear
-print_header "网心云极简一键部署 (v5.4.2)"
+print_header "网心云极简一键部署 (v5.5.0)"
 
 # ==================== 1. 配置读取逻辑 ====================
 CONFIG_DIR="/etc/wxedge-manager"
@@ -50,8 +50,8 @@ DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
 # 1.1 尝试从 daemon.json 读取代理
 DETECTED_PROXY=""
 if [ -f "$DOCKER_DAEMON_JSON" ]; then
-    # 使用最基础的 grep 和 cut，不使用高级正则
-    DETECTED_PROXY=$(grep '"http-proxy"' "$DOCKER_DAEMON_JSON" | cut -d'"' -f4 || echo "")
+    # 使用更稳健的 grep 提取方式
+    DETECTED_PROXY=$(grep '"http-proxy"' "$DOCKER_DAEMON_JSON" | sed 's/.*"http-proxy": *"\([^"]*\)".*/\1/' || echo "")
 fi
 
 # 1.2 读取本地已保存配置
@@ -215,8 +215,15 @@ cat > "$MONITOR_SCRIPT" <<EOF
 #!/bin/bash
 . /etc/wxedge-manager/config.sh
 if [ ! -d "\$MONITOR_PATH" ]; then exit 0; fi
+# 增强的磁盘空间检测逻辑
 USED=\$(df "\$MONITOR_PATH" | awk 'NR==2 {print \$5}' | sed 's/%//')
-if [ "\$USED" -gt "\$THRESHOLD_PERCENT" ]; then
+if [ -z "\$USED" ] || [ "\$USED" -eq "\$USED" ] 2>/dev/null; then
+    :
+else
+    USED=\$(df "\$MONITOR_PATH" | awk 'NR==3 {print \$4}' | sed 's/%//')
+fi
+
+if [ -n "\$USED" ] && [ "\$USED" -gt "\$THRESHOLD_PERCENT" ]; then
     echo "\$(date): 磁盘使用率 \${USED}% 触发清理" >> "\$LOG_FILE"
     docker stop "\$DOCKER_CONTAINER"
     if [ -n "\$CLEAN_PATH" ] && [ -d "\$CLEAN_PATH" ]; then
