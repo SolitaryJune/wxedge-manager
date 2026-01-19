@@ -1,5 +1,5 @@
 #!/bin/sh
-# 网心云 Docker 极致一键部署工具 (v5.6.1)
+# 网心云 Docker 极致一键部署工具 (v5.6.2)
 # 针对 POSIX 标准进行了极致优化，确保在所有 Shell 环境下无语法错误
 
 # 颜色定义
@@ -20,13 +20,18 @@ print_info() { printf "${GREEN}[INFO]${NC} %s\n" "$1"; }
 print_warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; }
 print_error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; }
 
-# 权限检查
+# 权限检查与自动提权
 if [ "$(id -u)" -ne 0 ]; then
-    printf "${RED}[ERROR] 请使用 root 权限运行此脚本 (sudo ./install.sh)${NC}\n"
-    exit 1
+    printf "${YELLOW}[INFO] 正在尝试获取 root 权限...${NC}\n"
+    if command -v sudo >/dev/null 2>&1; then
+        exec sudo "$0" "$@"
+    else
+        printf "${RED}[ERROR] 系统未安装 sudo，请手动切换到 root 用户运行此脚本。${NC}\n"
+        exit 1
+    fi
 fi
 
-print_header "网心云极简一键部署 (v5.6.1)"
+print_header "网心云极简一键部署 (v5.6.2)"
 
 # ==================== 1. 环境准备 ====================
 # 安装必要工具
