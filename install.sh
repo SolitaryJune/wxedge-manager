@@ -1,5 +1,5 @@
 #!/bin/sh
-# 网心云 Docker 极致一键部署工具 (v5.6.3)
+# 网心云 Docker 极致一键部署工具 (v5.6.4)
 # 针对 POSIX 标准进行了极致优化，确保在所有 Shell 环境下无语法错误
 
 # 颜色定义
@@ -31,7 +31,7 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
-print_header "网心云极简一键部署 (v5.6.3)"
+print_header "网心云极简一键部署 (v5.6.4)"
 
 # ==================== 1. 环境准备 ====================
 # 安装必要工具
@@ -150,8 +150,31 @@ EOF
 fi
 
 # 拉取并运行网心云
-print_info "拉取镜像 onething1/wxedge:3.0.2..."
-docker pull onething1/wxedge:3.0.2
+IMAGE_NAME="onething1/wxedge:3.0.2"
+MIRRORS="docker.xuanyuan.me docker.gushao.club"
+
+print_info "正在尝试拉取镜像 $IMAGE_NAME..."
+if docker pull "$IMAGE_NAME"; then
+    print_info "镜像拉取成功！"
+else
+    print_warn "官方源拉取失败，尝试使用加速镜像源..."
+    SUCCESS=0
+    for mirror in $MIRRORS; do
+        print_info "尝试从 $mirror 拉取..."
+        if docker pull "$mirror/$IMAGE_NAME"; then
+            print_info "从 $mirror 拉取成功，正在重命名镜像..."
+            docker tag "$mirror/$IMAGE_NAME" "$IMAGE_NAME"
+            docker rmi "$mirror/$IMAGE_NAME"
+            SUCCESS=1
+            break
+        fi
+    done
+    
+    if [ $SUCCESS -eq 0 ]; then
+        print_error "所有镜像源均拉取失败，请检查网络连接或代理设置。"
+        exit 1
+    fi
+fi
 
 print_info "启动网心云容器..."
 docker stop wxedge >/dev/null 2>&1
@@ -162,7 +185,7 @@ docker run -d --name wxedge \
   --restart unless-stopped \
   -p 18888:18888 \
   -v "$WXEDGE_DATA_DIR":/storage \
-  onething1/wxedge:3.0.2
+  "$IMAGE_NAME"
 
 # ==================== 6. 强制安装测速脚本 ====================
 print_info "安装强制测速脚本..."
@@ -206,7 +229,7 @@ CRON_SCHEDULE="0 2 * * *"
 if command -v crontab >/dev/null 2>&1; then
     (crontab -l 2>/dev/null | grep -v "$MONITOR_SCRIPT"; echo "$CRON_SCHEDULE $MONITOR_SCRIPT") | crontab -
 else
-    print_warn "未检测 to crontab，无法设置定时任务。"
+    print_warn "未检测到 crontab，无法设置定时任务。"
 fi
 
 print_header "部署完成！"
