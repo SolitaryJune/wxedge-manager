@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# 网心云 Docker 极致一键部署工具 (v5.4.0)
+# 网心云 Docker 极致一键部署工具 (v5.4.1)
 # 特性：优先读取 daemon.json，代理自动检测与回退，配置自动读取，一键到底
 # ==============================================================================
 
@@ -29,7 +29,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 clear
-print_header "网心云极简一键部署 (v5.4.0)"
+print_header "网心云极简一键部署 (v5.4.1)"
 
 # ==================== 1. 配置读取逻辑 ====================
 CONFIG_DIR="/etc/wxedge-manager"
@@ -46,12 +46,8 @@ DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
 # 1.1 尝试从 daemon.json 读取代理
 DETECTED_PROXY=""
 if [ -f "$DOCKER_DAEMON_JSON" ]; then
-    # 尝试提取 proxies 字段中的 http-proxy (需要 jq，如果没有则用 grep 简单提取)
-    if command -v jq &> /dev/null; then
-        DETECTED_PROXY=$(jq -r '.proxies."http-proxy" // empty' "$DOCKER_DAEMON_JSON")
-    else
-        DETECTED_PROXY=$(grep -oP '"http-proxy":\s*"\K[^"]+' "$DOCKER_DAEMON_JSON" || true)
-    fi
+    # 使用更通用的 grep 提取方式，避免 jq 依赖和复杂语法
+    DETECTED_PROXY=$(grep -o '"http-proxy": *"[^"]*"' "$DOCKER_DAEMON_JSON" | cut -d'"' -f4 || true)
 fi
 
 # 1.2 读取本地已保存配置
@@ -60,7 +56,7 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
-# 1.3 确定代理默认值：优先已保存配置 > daemon.json > 留空
+# 1.3 确定代理默认值
 FINAL_PROXY_DEFAULT="${DOCKER_PROXY:-$DETECTED_PROXY}"
 
 # ==================== 2. Docker 环境检查与安装 ====================
@@ -96,34 +92,35 @@ fi
 # 优先使用已保存的路径
 CUR_MONITOR_PATH="${MONITOR_PATH:-$RECOMMENDED_PATH}"
 while true; do
-    read -p "$(echo -e ${BLUE}[?]${NC} 请输入要监控的磁盘路径 ${YELLOW}[默认: $CUR_MONITOR_PATH]${NC}: )" input
+    echo -ne "${BLUE}[?]${NC} 请输入要监控的磁盘路径 ${YELLOW}[默认: $CUR_MONITOR_PATH]${NC}: "
+    read input
     MONITOR_PATH="${input:-$CUR_MONITOR_PATH}"
     if [ -d "$MONITOR_PATH" ]; then break; else print_error "路径 [$MONITOR_PATH] 不存在，请重新输入！"; fi
 done
 
 # 优先使用已保存的数据目录
 CUR_DATA_DIR="${WXEDGE_DATA_DIR:-${MONITOR_PATH}/1000/WXY}"
-read -p "$(echo -e ${BLUE}[?]${NC} 请输入网心云数据目录 ${YELLOW}[默认: $CUR_DATA_DIR]${NC}: )" input
+echo -ne "${BLUE}[?]${NC} 请输入网心云数据目录 ${YELLOW}[默认: $CUR_DATA_DIR]${NC}: "
+read input
 WXEDGE_DATA_DIR="${input:-$CUR_DATA_DIR}"
 
 # ==================== 4. 代理检测逻辑 ====================
 print_header "2. 代理检测"
 
-read -p "$(echo -e ${BLUE}[?]${NC} 请输入代理地址 (留空则跳过) ${YELLOW}[默认: $FINAL_PROXY_DEFAULT]${NC}: )" input
+echo -ne "${BLUE}[?]${NC} 请输入代理地址 (留空则跳过) ${YELLOW}[默认: $FINAL_PROXY_DEFAULT]${NC}: "
+read input
 DOCKER_PROXY="${input:-$FINAL_PROXY_DEFAULT}"
 
 USE_PROXY=false
-if [ -z "$DOCKER_PROXY" ]; then
-    print_info "未设置代理，将直接使用本地网络。"
-else
+if [ -n "$DOCKER_PROXY" ]; then
     print_info "正在检测代理 [$DOCKER_PROXY] 是否可用..."
-    # 尝试通过代理访问 Docker Hub 或 Google
-    if curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://registry-1.docker.io > /dev/null || \
-       curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://www.google.com > /dev/null; then
+    # 使用更通用的 curl 语法
+    if curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://registry-1.docker.io > /dev/null 2>&1 || \
+       curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://www.baidu.com > /dev/null 2>&1; then
         print_info "代理连接成功，将应用代理配置。"
         USE_PROXY=true
     else
-        print_warn "代理连接失败 (Connection Refused)，将自动跳过代理配置。"
+        print_warn "代理连接失败，将自动跳过代理配置。"
         DOCKER_PROXY=""
     fi
 fi
@@ -139,7 +136,8 @@ echo -e "  - 数据目录：$WXEDGE_DATA_DIR"
 echo -e "  - 代理状态：$( [ "$USE_PROXY" = true ] && echo "已启用 ($DOCKER_PROXY)" || echo "已跳过" )"
 echo -e "  - 自动清理：磁盘使用率 > 90% 时清理缓存"
 
-read -p "$(echo -e ${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: )" confirm
+echo -ne "${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: "
+read confirm
 if [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
     print_warn "部署已取消。"
     exit 0
@@ -162,7 +160,7 @@ CRON_SCHEDULE="$CRON_SCHEDULE"
 DOCKER_PROXY="$DOCKER_PROXY"
 EOF
 
-# 应用 Docker 代理 (使用 systemd 方式，这是最通用的)
+# 应用 Docker 代理
 if [ "$USE_PROXY" = true ]; then
     print_info "配置 Docker 代理..."
     mkdir -p /etc/systemd/system/docker.service.d
