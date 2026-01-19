@@ -1,11 +1,9 @@
 #!/bin/bash
 
 # ==============================================================================
-# 网心云 Docker 极致一键部署工具 (v5.4.1)
-# 特性：优先读取 daemon.json，代理自动检测与回退，配置自动读取，一键到底
+# 网心云 Docker 极致一键部署工具 (v5.4.2)
+# 特性：POSIX 兼容语法，优先读取 daemon.json，代理自动检测与回退
 # ==============================================================================
-
-set -e
 
 # 颜色输出
 RED='\033[0;31m'
@@ -16,20 +14,26 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # 打印函数
-print_header() { echo -e "\n${CYAN}========================================${NC}\n${CYAN}$1${NC}\n${CYAN}========================================${NC}\n"; }
+print_header() {
+    echo ""
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "${CYAN}$1${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+}
 print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 print_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # ==================== 0. 权限前置检查 ====================
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     print_warn "正在请求 root 权限以开始安装..."
     exec sudo "$0" "$@"
     exit $?
 fi
 
 clear
-print_header "网心云极简一键部署 (v5.4.1)"
+print_header "网心云极简一键部署 (v5.4.2)"
 
 # ==================== 1. 配置读取逻辑 ====================
 CONFIG_DIR="/etc/wxedge-manager"
@@ -46,14 +50,14 @@ DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
 # 1.1 尝试从 daemon.json 读取代理
 DETECTED_PROXY=""
 if [ -f "$DOCKER_DAEMON_JSON" ]; then
-    # 使用更通用的 grep 提取方式，避免 jq 依赖和复杂语法
-    DETECTED_PROXY=$(grep -o '"http-proxy": *"[^"]*"' "$DOCKER_DAEMON_JSON" | cut -d'"' -f4 || true)
+    # 使用最基础的 grep 和 cut，不使用高级正则
+    DETECTED_PROXY=$(grep '"http-proxy"' "$DOCKER_DAEMON_JSON" | cut -d'"' -f4 || echo "")
 fi
 
 # 1.2 读取本地已保存配置
 if [ -f "$CONFIG_FILE" ]; then
     print_info "检测到本地配置，正在加载..."
-    source "$CONFIG_FILE"
+    . "$CONFIG_FILE"
 fi
 
 # 1.3 确定代理默认值
@@ -61,7 +65,7 @@ FINAL_PROXY_DEFAULT="${DOCKER_PROXY:-$DETECTED_PROXY}"
 
 # ==================== 2. Docker 环境检查与安装 ====================
 print_info "正在检查 Docker 环境..."
-if ! command -v docker &> /dev/null; then
+if ! command -v docker >/dev/null 2>&1; then
     print_warn "未检测到 Docker，正在自动安装..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh --mirror Aliyun || sh get-docker.sh || { print_error "Docker 安装失败，请检查网络。"; exit 1; }
@@ -74,13 +78,10 @@ fi
 # ==================== 3. 核心路径配置 ====================
 print_header "1. 路径配置"
 
-# 列出磁盘列表
 print_info "当前系统磁盘列表："
 echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
-printf "%-15s %-10s %-10s %-10s %-10s %s\n" "设备名" "文件系统" "总容量" "已用" "剩余" "挂载点"
+df -hT | grep -E '^/dev/' | grep -v 'tmpfs' || true
 echo -e "${YELLOW}----------------------------------------------------------------------${NC}"
-df -hT | grep -E '^/dev/' | grep -v 'tmpfs' | awk '{printf "%-15s %-10s %-10s %-10s %-10s %s\n", $1, $2, $3, $4, $5, $7}' || true
-echo -e "${YELLOW}----------------------------------------------------------------------${NC}\n"
 
 # 自动寻找容量最大的挂载点作为推荐
 RECOMMENDED_PATH=$(df -hP | grep -E '^/dev/' | grep -v ' /$' | sort -k2 -hr | head -n 1 | awk '{print $6}')
@@ -111,14 +112,13 @@ echo -ne "${BLUE}[?]${NC} 请输入代理地址 (留空则跳过) ${YELLOW}[默�
 read input
 DOCKER_PROXY="${input:-$FINAL_PROXY_DEFAULT}"
 
-USE_PROXY=false
+USE_PROXY=0
 if [ -n "$DOCKER_PROXY" ]; then
     print_info "正在检测代理 [$DOCKER_PROXY] 是否可用..."
-    # 使用更通用的 curl 语法
-    if curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://registry-1.docker.io > /dev/null 2>&1 || \
-       curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://www.baidu.com > /dev/null 2>&1; then
+    if curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://registry-1.docker.io >/dev/null 2>&1 || \
+       curl --proxy "$DOCKER_PROXY" -s --connect-timeout 5 https://www.baidu.com >/dev/null 2>&1; then
         print_info "代理连接成功，将应用代理配置。"
-        USE_PROXY=true
+        USE_PROXY=1
     else
         print_warn "代理连接失败，将自动跳过代理配置。"
         DOCKER_PROXY=""
@@ -130,15 +130,21 @@ CLEAN_PATH="${WXEDGE_DATA_DIR}/.onething_data/task"
 LOG_FILE="${WXEDGE_DATA_DIR}/wxedge-monitor.log"
 DOCKER_VOLUME="${WXEDGE_DATA_DIR}:/storage"
 
-echo -e "\n${CYAN}即将开始自动部署，配置摘要：${NC}"
+echo ""
+echo -e "${CYAN}即将开始自动部署，配置摘要：${NC}"
 echo -e "  - 监控磁盘：$MONITOR_PATH"
 echo -e "  - 数据目录：$WXEDGE_DATA_DIR"
-echo -e "  - 代理状态：$( [ "$USE_PROXY" = true ] && echo "已启用 ($DOCKER_PROXY)" || echo "已跳过" )"
+if [ "$USE_PROXY" -eq 1 ]; then
+    echo -e "  - 代理状态：已启用 ($DOCKER_PROXY)"
+else
+    echo -e "  - 代理状态：已跳过"
+fi
 echo -e "  - 自动清理：磁盘使用率 > 90% 时清理缓存"
+echo ""
 
 echo -ne "${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: "
 read confirm
-if [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
+if [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
     print_warn "部署已取消。"
     exit 0
 fi
@@ -161,7 +167,7 @@ DOCKER_PROXY="$DOCKER_PROXY"
 EOF
 
 # 应用 Docker 代理
-if [ "$USE_PROXY" = true ]; then
+if [ "$USE_PROXY" -eq 1 ]; then
     print_info "配置 Docker 代理..."
     mkdir -p /etc/systemd/system/docker.service.d
     cat > /etc/systemd/system/docker.service.d/http-proxy.conf <<EOF
@@ -194,8 +200,8 @@ fi
 # 启动容器
 print_info "启动网心云容器..."
 mkdir -p "$WXEDGE_DATA_DIR"
-docker stop "$DOCKER_CONTAINER" 2>/dev/null || true
-docker rm "$DOCKER_CONTAINER" 2>/dev/null || true
+docker stop "$DOCKER_CONTAINER" >/dev/null 2>&1 || true
+docker rm "$DOCKER_CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$DOCKER_CONTAINER" \
     --network host \
     --restart unless-stopped \
@@ -205,17 +211,18 @@ docker run -d --name "$DOCKER_CONTAINER" \
 # 配置监控脚本
 print_info "配置磁盘自动清理任务..."
 MONITOR_SCRIPT="$CONFIG_DIR/monitor.sh"
-cat > "$MONITOR_SCRIPT" <<'EOF'
+cat > "$MONITOR_SCRIPT" <<EOF
 #!/bin/bash
-source /etc/wxedge-manager/config.sh
-if [ ! -d "$MONITOR_PATH" ]; then exit 0; fi
-USED=$(df "$MONITOR_PATH" | awk 'NR==2 {print $5}' | sed 's/%//')
-if [[ ! "$USED" =~ ^[0-9]+$ ]]; then USED=$(df "$MONITOR_PATH" | awk 'NR==3 {print $4}' | sed 's/%//'); fi
-if [ "$USED" -gt "$THRESHOLD_PERCENT" ]; then
-    echo "$(date): 磁盘使用率 ${USED}% 触发清理" >> "$LOG_FILE"
-    docker stop "$DOCKER_CONTAINER"
-    [ -n "$CLEAN_PATH" ] && [ -d "$CLEAN_PATH" ] && rm -rf "$CLEAN_PATH"/*
-    docker start "$DOCKER_CONTAINER"
+. /etc/wxedge-manager/config.sh
+if [ ! -d "\$MONITOR_PATH" ]; then exit 0; fi
+USED=\$(df "\$MONITOR_PATH" | awk 'NR==2 {print \$5}' | sed 's/%//')
+if [ "\$USED" -gt "\$THRESHOLD_PERCENT" ]; then
+    echo "\$(date): 磁盘使用率 \${USED}% 触发清理" >> "\$LOG_FILE"
+    docker stop "\$DOCKER_CONTAINER"
+    if [ -n "\$CLEAN_PATH" ] && [ -d "\$CLEAN_PATH" ]; then
+        rm -rf "\$CLEAN_PATH"/*
+    fi
+    docker start "\$DOCKER_CONTAINER"
 fi
 EOF
 chmod +x "$MONITOR_SCRIPT"
