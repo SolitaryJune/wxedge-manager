@@ -1,5 +1,5 @@
 #!/bin/sh
-# 网心云 Docker 极致一键部署工具 (v5.6.7)
+# 网心云 Docker 极致一键部署工具 (v5.6.8)
 # 针对 POSIX 标准进行了极致优化，确保在所有 Shell 环境下无语法错误
 
 # 颜色定义
@@ -31,7 +31,7 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
-print_header "网心云极简一键部署 (v5.6.7)"
+print_header "网心云极简一键部署 (v5.6.8)"
 
 # ==================== 1. 环境准备 ====================
 # 安装必要工具
@@ -120,7 +120,7 @@ else
     printf "  - 代理状态：已跳过\n"
 fi
 printf "  - 自动清理：磁盘使用率 > 85%% 时清理缓存\n"
-printf "  - 端口映射：18888:18888 (Bridge 模式)\n"
+printf "  - 网络模式：Host 模式 (--network host)\n"
 printf "  - 运行权限：特权模式 (--privileged)\n"
 printf "${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: "
 read input
@@ -181,12 +181,12 @@ print_info "启动网心云容器..."
 docker stop wxedge >/dev/null 2>&1
 docker rm wxedge >/dev/null 2>&1
 mkdir -p "$WXEDGE_DATA_DIR"
-# 修复：移除 --network host，改为端口映射 -p 18888:18888
+# 修复：改为 --network host 模式
 # 增加：--privileged 特权模式运行
 docker run -d --name wxedge \
   --restart unless-stopped \
   --privileged \
-  -p 18888:18888 \
+  --network host \
   -v "$WXEDGE_DATA_DIR":/storage \
   "$IMAGE_NAME"
 
