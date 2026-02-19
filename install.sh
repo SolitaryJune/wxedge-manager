@@ -1,5 +1,5 @@
 #!/bin/sh
-# 网心云 Docker 极致一键部署工具 (v5.6.6)
+# 网心云 Docker 极致一键部署工具 (v5.6.7)
 # 针对 POSIX 标准进行了极致优化，确保在所有 Shell 环境下无语法错误
 
 # 颜色定义
@@ -31,7 +31,7 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
-print_header "网心云极简一键部署 (v5.6.6)"
+print_header "网心云极简一键部署 (v5.6.7)"
 
 # ==================== 1. 环境准备 ====================
 # 安装必要工具
@@ -119,7 +119,7 @@ if [ $USE_PROXY -eq 1 ]; then
 else
     printf "  - 代理状态：已跳过\n"
 fi
-printf "  - 自动清理：磁盘使用率 > 80%% 时清理缓存\n"
+printf "  - 自动清理：磁盘使用率 > 85%% 时清理缓存\n"
 printf "  - 端口映射：18888:18888 (Bridge 模式)\n"
 printf "  - 运行权限：特权模式 (--privileged)\n"
 printf "${BLUE}[?]${NC} 确认以上配置并开始部署？ ${YELLOW}[Y/n]${NC}: "
@@ -215,8 +215,8 @@ if [ -z "\$USED" ]; then
     USED=\$(df "\$MONITOR_PATH" | awk 'NR==3 {print \$4}' | sed 's/%//')
 fi
 
-# 阈值修改为 80%
-if [ -n "\$USED" ] && [ "\$USED" -gt 80 ]; then
+# 阈值修改为 85%
+if [ -n "\$USED" ] && [ "\$USED" -gt 85 ]; then
     echo "\$(date): 磁盘使用率 \${USED}%% 触发清理" >> "\$LOG_FILE"
     docker stop wxedge
     if [ -d "\$CLEAN_PATH" ] && [ -n "\$CLEAN_PATH" ]; then
